@@ -30,9 +30,16 @@ app = FastAPI(
 ATTRACTIONS = load_attractions()
 
 
+def default_db_path() -> str:
+    """Vercel's filesystem is read-only except /tmp, so store the demo database there."""
+    if "QUEUECAST_DB" in os.environ:
+        return os.environ["QUEUECAST_DB"]
+    return "/tmp/queuecast.db" if os.environ.get("VERCEL") else "queuecast.db"
+
+
 @lru_cache
 def get_store() -> RunStore:
-    return RunStore(os.environ.get("QUEUECAST_DB", "queuecast.db"))
+    return RunStore(default_db_path())
 
 
 StoreDep = Annotated[RunStore, Depends(get_store)]
