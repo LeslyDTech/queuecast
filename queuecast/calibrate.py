@@ -85,13 +85,21 @@ def calibrate_attraction(
     )
 
 
-def calibrate_file(path: Path, seeds=DEFAULT_SEEDS) -> list[CalibrationResult]:
-    """Recalibrate every record in an attractions JSON file that has a real target."""
+def calibrate_file(
+    path: Path, seeds=DEFAULT_SEEDS, missing_only: bool = False
+) -> list[CalibrationResult]:
+    """Recalibrate every record in an attractions JSON file that has a real target.
+
+    With missing_only, only rides that have no demand yet are calibrated, so
+    adding a new park doesn't mean refitting every existing ride.
+    """
     records = json.loads(path.read_text("utf-8"))
     results = []
     for record in records:
         target = record.get("real_avg_posted_wait_min")
         if target is None:
+            continue
+        if missing_only and record.get("base_arrivals_per_hour") is not None:
             continue
         attraction = Attraction(**{**record, "base_arrivals_per_hour": 0})
         result = calibrate_attraction(attraction, target, seeds)
