@@ -1,0 +1,38 @@
+[
+  {
+    "id": "comet-coaster",
+    "name": "Comet Coaster",
+    "vehicle_capacity": 24,
+    "dispatch_interval_s": 60,
+    "base_arrivals_per_hour": 1750,
+    "mtbf_minutes": 240,
+    "mttr_minutes": 20
+  },
+  {
+    "id": "lagoon-riverboat",
+    "name": "Lagoon Riverboat",
+    "vehicle_capacity": 120,
+    "dispatch_interval_s": 480,
+    "base_arrivals_per_hour": 850,
+    "mtbf_minutes": null,
+    "mttr_minutes": null
+  },
+  {
+    "id": "starlight-spinner",
+    "name": "Starlight Spinner",
+    "vehicle_capacity": 32,
+    "dispatch_interval_s": 150,
+    "base_arrivals_per_hour": 820,
+    "mtbf_minutes": 480,
+    "mttr_minutes": 15
+  },
+  {
+    "id": "haunted-hotel-drop",
+    "name": "Haunted Hotel Drop",
+    "vehicle_capacity": 21,
+    "dispatch_interval_s": 90,
+    "base_arrivals_per_hour": 900,
+    "mtbf_minutes": 180,
+    "mttr_minutes": 25
+  }
+]

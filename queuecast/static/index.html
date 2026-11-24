@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QueueCast</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --ink:#1d2433; --muted:#5d6678; --line:#dfe3ea; --bg:#f7f8fa; --accent:#2f5bd3; --warm:#d9822b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:20px 32px; border-bottom:1px solid var(--line); background:#fff; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:14px; }
+  main { display:grid; grid-template-columns: 280px 1fr; gap:24px; padding:24px 32px; max-width:1200px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:20px; }
+  label { display:block; font-size:13px; font-weight:600; margin:14px 0 6px; }
+  label span { float:right; font-weight:400; color:var(--muted); }
+  select, input[type=range], input[type=number] { width:100%; }
+  select, input[type=number] { padding:8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  button { margin-top:20px; width:100%; padding:10px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .stats { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:16px; }
+  .stat { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .stat .k { font-size:12px; color:var(--muted); }
+  .stat .v { font-size:22px; font-weight:700; margin-top:4px; }
+  .check { display:flex; gap:8px; align-items:center; font-weight:400; }
+  #error { color:#b42318; font-size:13px; margin-top:10px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>QueueCast</h1>
+  <p>Simulate one operating day and see how wait times respond to crowds, priority-lane usage, and ride downtime.</p>
+</header>
+<main>
+  <section class="panel">
+    <label for="attraction">Attraction</label>
+    <select id="attraction"></select>
+
+    <label for="crowd">Crowd level <span id="crowdVal">1.0x</span></label>
+    <input id="crowd" type="range" min="0.5" max="2" step="0.1" value="1" />
+
+    <label for="priority">Priority lane share <span id="priorityVal">0%</span></label>
+    <input id="priority" type="range" min="0" max="0.8" step="0.05" value="0" />
+
+    <label for="seed">Random seed</label>
+    <input id="seed" type="number" value="42" />
+
+    <label class="check"><input id="breakdowns" type="checkbox" checked /> Include breakdowns</label>
+
+    <button id="run">Run simulation</button>
+    <div id="error"></div>
+  </section>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><div class="k">Standby avg wait</div><div class="v" id="sAvg">–</div></div>
+      <div class="stat"><div class="k">Standby 90th pct</div><div class="v" id="sP90">–</div></div>
+      <div class="stat"><div class="k">Guests / hour</div><div class="v" id="tput">–</div></div>
+      <div class="stat"><div class="k">Downtime</div><div class="v" id="down">–</div></div>
+    </div>
+    <div class="panel"><canvas id="chart" height="130"></canvas></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let chart;
+
+function clock(minFromOpen) {
+  const total = 9 * 60 + minFromOpen, h = Math.floor(total / 60), m = total % 60;
+  return `${((h - 1) % 12) + 1}:${String(m).padStart(2, "0")}${h < 12 ? "a" : "p"}`;
+}
+
+async function loadAttractions() {
+  const res = await fetch("/attractions");
+  const list = await res.json();
+  $("attraction").innerHTML = list
+    .map((a) => `<option value="${a.id}">${a.name} (${a.theoretical_hourly_capacity}/hr)</option>`)
+    .join("");
+}
+
+async function run() {
+  $("run").disabled = true;
+  $("error").textContent = "";
+  try {
+    const body = {
+      attraction_id: $("attraction").value,
+      crowd_multiplier: Number($("crowd").value),
+      priority_share: Number($("priority").value),
+      seed: Number($("seed").value),
+      breakdowns_enabled: $("breakdowns").checked,
+    };
+    const created = await fetch("/simulations", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!created.ok) throw new Error((await created.json()).detail ?? "Simulation failed");
+    const { run_id, summary } = await created.json();
+    const waits = await (await fetch(`/simulations/${run_id}/wait-times`)).json();
+
+    $("sAvg").textContent = `${summary.standby_avg_wait_min} min`;
+    $("sP90").textContent = `${summary.standby_p90_wait_min} min`;
+    $("tput").textContent = summary.throughput_per_hour;
+    $("down").textContent = `${summary.downtime_min} min`;
+    draw(waits);
+  } catch (err) {
+    $("error").textContent = err.message;
+  } finally {
+    $("run").disabled = false;
+  }
+}
+
+function draw(waits) {
+  const data = {
+    labels: waits.map((w) => clock(w.bucket_start_min)),
+    datasets: [
+      { label: "Standby wait (min)", data: waits.map((w) => w.standby_avg_wait_min), borderColor: "#2f5bd3", tension: 0.3, pointRadius: 0, spanGaps: true },
+      { label: "Priority wait (min)", data: waits.map((w) => w.priority_avg_wait_min), borderColor: "#d9822b", tension: 0.3, pointRadius: 0, spanGaps: true },
+    ],
+  };
+  if (chart) { chart.data = data; chart.update(); return; }
+  chart = new Chart($("chart"), {
+    type: "line", data,
+    options: { interaction: { mode: "index", intersect: false }, scales: { y: { beginAtZero: true, title: { display: true, text: "Minutes" } } } },
+  });
+}
+
+$("crowd").oninput = (e) => ($("crowdVal").textContent = `${Number(e.target.value).toFixed(1)}x`);
+$("priority").oninput = (e) => ($("priorityVal").textContent = `${Math.round(e.target.value * 100)}%`);
+$("run").onclick = run;
+loadAttractions().then(run);
+</script>
+</body>
+</html>

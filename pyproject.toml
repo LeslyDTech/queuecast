@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "queuecast"
+version = "0.1.0"
+description = "Discrete-event simulator that forecasts theme park attraction wait times and tests what-if operating scenarios."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "httpx>=0.27", "ruff>=0.5"]
+
+[project.scripts]
+queuecast = "queuecast.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["queuecast*"]
+
+[tool.setuptools.package-data]
+queuecast = ["data/*.json", "static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
