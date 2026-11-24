@@ -57,6 +57,41 @@ def test_parse_sorts_longest_open_wait_first_and_closed_last():
     assert rides[-1].wait_time_min is None  # closed rides have no wait
 
 
+def test_single_rider_lines_fold_into_main_ride():
+    payload = {"lands": [{"name": "New York", "rides": [
+        {"id": 1, "name": "Revenge of the Mummy", "is_open": True, "wait_time": 40},
+        {"id": 2, "name": "Revenge of the Mummy™ Single Rider", "is_open": True, "wait_time": 0},
+        {"id": 3, "name": "E.T. Adventure", "is_open": True, "wait_time": 20},
+    ]}], "rides": [
+        # Queue-Times sometimes lists a single-rider line outside any land
+        {"id": 4, "name": "E.T. Adventure® single rider", "is_open": False, "wait_time": 0},
+        {"id": 5, "name": "Orphan Ride Single Rider", "is_open": True, "wait_time": 0},
+    ]}
+    rides = {r.name: r for r in parse_rides(payload)}
+    assert set(rides) == {"Revenge of the Mummy", "E.T. Adventure"}
+    assert rides["Revenge of the Mummy"].single_rider_open is True
+    assert rides["E.T. Adventure"].single_rider_open is False  # its single-rider line is closed
+
+
+def test_single_rider_zeros_do_not_lower_park_average():
+    payload = {"lands": [{"name": "A", "rides": [
+        {"name": "Hulk", "is_open": True, "wait_time": 40},
+        {"name": "Hulk Single Rider", "is_open": True, "wait_time": 0},
+    ]}]}
+    client, _, _ = make_client(payload)
+    data = client.get_park(64)
+    assert data["open_rides"] == 1
+    assert data["average_wait_min"] == 40.0
+
+
+def test_closed_ride_never_shows_single_rider():
+    payload = {"lands": [{"name": "A", "rides": [
+        {"name": "Kong", "is_open": False, "wait_time": 0},
+        {"name": "Kong Single Rider", "is_open": True, "wait_time": 0},
+    ]}]}
+    assert parse_rides(payload)[0].single_rider_open is False
+
+
 def test_parse_handles_rides_without_lands():
     rides = parse_rides({"lands": [], "rides": [
         {"name": "Solo", "is_open": True, "wait_time": 5, "last_updated": ""}]})

@@ -36,6 +36,7 @@
   .live-meta { color:var(--muted); font-size:13px; margin-bottom:12px; }
   .ride { display:grid; grid-template-columns: minmax(180px, 2fr) 3fr 64px; gap:12px; align-items:center; padding:7px 0; border-top:1px solid var(--line); font-size:14px; }
   .ride:first-child { border-top:0; }
+  .ride .tag { display:inline-block; margin-left:8px; padding:1px 7px; border-radius:999px; background:#e8eefc; color:var(--accent); font-size:11px; font-weight:600; vertical-align:1px; }
   .ride .land { display:block; color:var(--muted); font-size:12px; }
   .ride .track { background:#eef1f6; border-radius:4px; height:10px; overflow:hidden; }
   .ride .fill { background:var(--accent); height:100%; }
@@ -222,6 +223,13 @@ function rideRow(r, maxWait) {
 
   const name = document.createElement("div");
   name.textContent = r.name;
+  if (r.single_rider_open) {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = "Single rider";
+    tag.title = "A single-rider line is open, usually much shorter";
+    name.append(tag);
+  }
   if (r.land) {
     const land = document.createElement("span");
     land.className = "land";

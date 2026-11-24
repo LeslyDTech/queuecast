@@ -10,10 +10,11 @@ used to fetch arbitrary URLs.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.request
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 API_URL = "https://queue-times.com/parks/{park_id}/queue_times.json"
 ATTRIBUTION = {"text": "Powered by Queue-Times.com", "url": "https://queue-times.com/"}
@@ -39,6 +40,16 @@ class LiveRide:
     is_open: bool
     wait_time_min: int | None  # None when the ride is closed
     last_updated: str
+    single_rider_open: bool = False  # True when the ride's single-rider line is running
+
+
+SINGLE_RIDER = re.compile(r"\s*single rider\s*$", re.IGNORECASE)
+
+
+def _base_name(name: str) -> str:
+    """Normalize names so "Revenge of the Mummy™ Single Rider" matches "Revenge of the Mummy"."""
+    name = SINGLE_RIDER.sub("", name)
+    return re.sub(r"[™®©]", "", name).strip().casefold()
 
 
 def _fetch_json(url: str) -> dict:
@@ -51,27 +62,42 @@ def _fetch_json(url: str) -> dict:
 
 
 def parse_rides(payload: dict) -> list[LiveRide]:
-    """Flatten the API's lands -> rides structure. Longest open waits first."""
+    """Flatten the API's lands -> rides structure. Longest open waits first.
+
+    Queue-Times lists single-rider lines as separate rides with a 0-minute wait.
+    They aren't separate rides, and their zeros would drag down park averages,
+    so they're folded into their main ride as a `single_rider_open` flag.
+    """
     if not isinstance(payload, dict):
         raise LiveDataError("Unexpected response format")
 
     rides: list[LiveRide] = []
+    single_rider_open: dict[str, bool] = {}
     groups = [(land.get("name", ""), land.get("rides", [])) for land in payload.get("lands", [])]
     groups.append(("", payload.get("rides", [])))  # some parks list rides without lands
 
     for land_name, items in groups:
         for r in items:
+            name = r.get("name", "Unknown")
+            if SINGLE_RIDER.search(name):
+                key = _base_name(name)
+                single_rider_open[key] = single_rider_open.get(key, False) or bool(r.get("is_open"))
+                continue
             is_open = bool(r.get("is_open"))
             rides.append(
                 LiveRide(
                     id=r.get("id"),
-                    name=r.get("name", "Unknown"),
+                    name=name,
                     land=land_name,
                     is_open=is_open,
                     wait_time_min=int(r.get("wait_time", 0)) if is_open else None,
                     last_updated=r.get("last_updated", ""),
                 )
             )
+    rides = [
+        replace(r, single_rider_open=r.is_open and single_rider_open.get(_base_name(r.name), False))
+        for r in rides
+    ]
     rides.sort(key=lambda r: (not r.is_open, -(r.wait_time_min or 0), r.name))
     return rides
 
