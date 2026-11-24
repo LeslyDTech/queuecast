@@ -92,6 +92,15 @@ def test_closed_ride_never_shows_single_rider():
     assert parse_rides(payload)[0].single_rider_open is False
 
 
+def test_schedule_markers_are_hidden():
+    payload = {"lands": [{"name": "Diagon Alley", "rides": [
+        {"name": "Hogwarts Express™ - King's Cross Station", "is_open": True, "wait_time": 30},
+        {"name": "Hogwarts™ Express - First Train", "is_open": False, "wait_time": 0},
+        {"name": "Hogwarts™ Express – Last Train", "is_open": False, "wait_time": 0},
+    ]}]}
+    assert [r.name for r in parse_rides(payload)] == ["Hogwarts Express™ - King's Cross Station"]
+
+
 def test_parse_handles_rides_without_lands():
     rides = parse_rides({"lands": [], "rides": [
         {"name": "Solo", "is_open": True, "wait_time": 5, "last_updated": ""}]})
@@ -152,6 +161,7 @@ def api():
 def test_live_parks_route(api):
     names = [p["name"] for p in api.get("/live/parks").json()]
     assert "Islands of Adventure" in names
+    assert names[0] == "Magic Kingdom"
 
 
 def test_live_park_route(api):

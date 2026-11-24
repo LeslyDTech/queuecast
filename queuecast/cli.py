@@ -39,8 +39,9 @@ def cmd_list(_: argparse.Namespace) -> int:
 def cmd_calibrate(args: argparse.Namespace) -> int:
     from queuecast.calibrate import calibrate_file
 
-    print(f"Calibrating demand in {args.file} (this takes about 5 minutes)...")
-    results = calibrate_file(Path(args.file))
+    scope = "new rides" if args.missing_only else "all rides (about 10 minutes)"
+    print(f"Calibrating demand for {scope} in {args.file}...")
+    results = calibrate_file(Path(args.file), missing_only=args.missing_only)
     print(f"{'ID':<48}{'REAL':>7}{'SIM':>7}{'ERROR':>7}{'DEMAND/HR':>11}")
     for r in results:
         print(f"{r.attraction_id:<48}{r.target_wait_min:>7}{r.simulated_wait_min:>7}"
@@ -99,6 +100,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     cal = sub.add_parser("calibrate", help="Fit each ride's demand to its real average wait")
     cal.add_argument("--file", default=str(DATA_FILE))
+    cal.add_argument("--missing-only", action="store_true",
+                     help="Only calibrate rides that have no demand yet")
     cal.set_defaults(func=cmd_calibrate)
 
     run = sub.add_parser("run", help="Simulate one day")

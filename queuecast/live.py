@@ -1,4 +1,6 @@
-"""Live posted wait times for real Orlando parks, from the Queue-Times.com Real Time API.
+"""Live posted wait times for real Orlando parks, from the Queue-Times.com API.
+
+Covers Walt Disney World and Universal Orlando.
 
 Queue-Times updates every 5 minutes and asks every app using it to show
 "Powered by Queue-Times.com" with a link back. The dashboard does that.
@@ -22,6 +24,10 @@ CACHE_SECONDS = 300  # the source only refreshes every 5 minutes
 TIMEOUT_SECONDS = 8
 
 PARKS: dict[int, str] = {
+    6: "Magic Kingdom",
+    5: "EPCOT",
+    7: "Hollywood Studios",
+    8: "Animal Kingdom",
     65: "Universal Studios Florida",
     64: "Islands of Adventure",
     334: "Epic Universe",
@@ -44,6 +50,8 @@ class LiveRide:
 
 
 SINGLE_RIDER = re.compile(r"\s*single rider\s*$", re.IGNORECASE)
+# Schedule markers some parks list as rides, e.g. "Hogwarts Express - First Train"
+SCHEDULE_MARKER = re.compile(r"[-–]\s*(first|last) train\s*$", re.IGNORECASE)
 
 
 def _base_name(name: str) -> str:
@@ -79,6 +87,8 @@ def parse_rides(payload: dict) -> list[LiveRide]:
     for land_name, items in groups:
         for r in items:
             name = r.get("name", "Unknown")
+            if SCHEDULE_MARKER.search(name):
+                continue
             if SINGLE_RIDER.search(name):
                 key = _base_name(name)
                 single_rider_open[key] = single_rider_open.get(key, False) or bool(r.get("is_open"))

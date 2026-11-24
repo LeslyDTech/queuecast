@@ -6,7 +6,7 @@
 
 ![QueueCast dashboard](docs/dashboard.png)
 
-**A discrete-event simulator that forecasts theme park wait times for 41 real Universal Orlando rides, calibrated against their actual average posted waits, and tests operating decisions before they happen on a real ride.**
+**A discrete-event simulator that forecasts theme park wait times for 86 real Walt Disney World and Universal Orlando rides, calibrated against their actual average posted waits, and tests operating decisions before they happen on a real ride.**
 
 I work in a theme park kitchen, so I watch crowds rise and fall all day. QueueCast models one operating day at a ride and answers questions like these:
 
@@ -14,7 +14,7 @@ I work in a theme park kitchen, so I watch crowds rise and fall all day. QueueCa
 - If 40% of guests use a priority lane, how much longer does standby get?
 - How much does a 20-minute breakdown at peak hours cost in wait time?
 
-It includes a Python simulation engine, a calibration step fit to real data, live posted waits for Universal Orlando, a SQLite results store, a REST API, a CLI, a browser dashboard, and a CI pipeline that tests every push.
+It includes a Python simulation engine, a calibration step fit to real data, live posted waits for 7 Orlando parks, a SQLite results store, a REST API, a CLI, a browser dashboard, and a CI pipeline that tests every push.
 
 ## Quick start
 
@@ -23,20 +23,22 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 
-queuecast list                                           # all 41 rides with real average waits
-queuecast run revenge-of-the-mummy --crowd 1.2           # simulate a busy day
-queuecast compare revenge-of-the-mummy --shares 0 0.2 0.4 0.6
-queuecast calibrate                                      # refit demand to real data (~5 min)
+queuecast list                                           # all 86 rides with real average waits
+queuecast run space-mountain --crowd 1.2                 # simulate a busy day
+queuecast compare space-mountain --shares 0 0.2 0.4 0.6
+queuecast calibrate --missing-only                       # fit demand for newly added rides
 
 uvicorn queuecast.api:app --reload                       # dashboard at http://127.0.0.1:8000
-pytest --cov=queuecast                                   # 71 tests
+pytest --cov=queuecast                                   # 76 tests
 ```
 
 ## Real data and calibration
 
-**Rides.** The 41 rides across Universal Studios Florida, Islands of Adventure, and Epic Universe come from [Queue-Times.com](https://queue-times.com/), along with each ride's all-time average posted wait.
+**Rides.** 86 rides across 7 parks come from [Queue-Times.com](https://queue-times.com/), along with each ride's all-time average posted wait:
+- **Walt Disney World:** Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
+- **Universal Orlando:** Universal Studios Florida, Islands of Adventure, and Epic Universe.
 
-**Capacity.** Universal doesn't publish seats per vehicle or dispatch intervals, so each ride's capacity is an **estimate** based on public descriptions of its ride system.
+**Capacity.** Neither Disney nor Universal publishes seats per vehicle or dispatch intervals, so each ride's capacity is an **estimate** based on public descriptions of its ride system.
 
 **Demand is calibrated.** How many guests show up is the one thing nobody publishes, so QueueCast solves for it. `queuecast calibrate` uses bisection to find the arrival rate at which the ride's simulated average posted wait, averaged over 20 simulated days, matches the real one.
 
@@ -44,8 +46,8 @@ pytest --cov=queuecast                                   # 71 tests
 
 | Measure | Result |
 | --- | --- |
-| Mean absolute error | 2.8 min |
-| Rides within 5 min of their real average | 41 of 41 |
+| Mean absolute error | 2.9 min |
+| Rides within 5 min of their real average | 86 of 86 |
 
 **A lesson from getting this to work.** My first attempt looked perfect, but only by luck. Every source of randomness shared one random-number stream, so a tiny change in demand reshuffled the whole day and the search could never converge reliably. I fixed it with *common random numbers* (separate streams for arrivals, lanes, and breakdowns) and *time-rescaled* arrivals (raising demand compresses arrival times smoothly instead of redrawing them). See [ADR 0003](docs/decisions/0003-common-random-numbers.md).
 
@@ -53,7 +55,7 @@ The full method and its limits are in [docs/DATA.md](docs/DATA.md).
 
 ## Live wait times
 
-The dashboard shows current posted waits for all three parks, refreshed at most every 5 minutes. For the selected ride it also compares three numbers:
+The dashboard shows current posted waits for all 7 parks, refreshed at most every 5 minutes. Single-rider lines appear as a tag on their main ride instead of a fake 0-minute row. For the selected ride it also compares three numbers:
 - the simulated average posted wait,
 - the real all-time average,
 - what's posted right now.
@@ -62,20 +64,20 @@ Live data is [Powered by Queue-Times.com](https://queue-times.com/).
 
 ## Example: the cost of a priority lane
 
-Same simulated day at Revenge of the Mummy (seed 42), changing only the share of guests who use a priority lane:
+Same simulated day at Space Mountain (seed 42), changing only the share of guests who use a priority lane:
 
 ```
-Revenge of the Mummy: priority-lane what-if (seed 42)
+Space Mountain: priority-lane what-if (seed 42)
  PRIORITY  STANDBY AVG  STANDBY P90  PRIORITY AVG
-       0%         53.8         81.4           0.0
-      20%         66.4        100.1           1.9
-      40%         86.5        131.2           4.0
-      60%         99.6        170.2          23.1
+       0%         64.3         97.0           0.0
+      20%         79.4        118.3           2.0
+      40%        103.5        154.6           4.8
+      60%        103.9        174.5          37.7
 ```
 
 When 40% of guests use the priority lane, the average standby guest waits 61% longer. At 60%, the priority lane itself starts to back up.
 
-These are **per-guest** averages, so they run higher than the ride's posted average of 31 minutes. Most guests arrive during the busy afternoon, when the line is longest.
+These are **per-guest** averages, so they run higher than the ride's posted average of 42 minutes. Most guests arrive during the busy afternoon, when the line is longest.
 
 ## How it works
 
@@ -148,14 +150,14 @@ queuecast/
   api.py         FastAPI app
   cli.py         command line interface
   static/        dashboard (HTML + Chart.js)
-  data/          41 Universal Orlando rides (estimated capacity, calibrated demand)
+  data/          86 Disney World and Universal Orlando rides (estimated capacity, calibrated demand)
 tests/           pytest suite
 docs/            architecture notes, data sources, decision records
 ```
 
 ## Notes
 
-Not affiliated with Universal or Queue-Times.com. Ride capacities are estimates, and posted waits come from the parks, which can differ from actual waits.
+Not affiliated with Disney, Universal, or Queue-Times.com. Ride capacities are estimates, and posted waits come from the parks, which can differ from actual waits.
 
 ## Roadmap
 

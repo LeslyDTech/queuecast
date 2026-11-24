@@ -23,6 +23,21 @@ def test_average_posted_wait_zero_demand():
     assert average_posted_wait(RIDE, seeds=(1,)) == 0.0
 
 
+def test_missing_only_leaves_calibrated_rides_alone(tmp_path):
+    path = tmp_path / "rides.json"
+    path.write_text(json.dumps([
+        {"id": "done", "name": "Done", "vehicle_capacity": 10, "dispatch_interval_s": 60,
+         "base_arrivals_per_hour": 555, "real_avg_posted_wait_min": 20},
+        {"id": "new", "name": "New", "vehicle_capacity": 10, "dispatch_interval_s": 60,
+         "base_arrivals_per_hour": None, "real_avg_posted_wait_min": 20},
+    ]))
+    results = calibrate_file(path, seeds=(1,), missing_only=True)
+    assert [r.attraction_id for r in results] == ["new"]
+    saved = json.loads(path.read_text())
+    assert saved[0]["base_arrivals_per_hour"] == 555
+    assert saved[1]["base_arrivals_per_hour"] > 0
+
+
 def test_calibrate_file_skips_rides_without_target(tmp_path):
     path = tmp_path / "rides.json"
     path.write_text(json.dumps([
@@ -35,7 +50,8 @@ def test_calibrate_file_skips_rides_without_target(tmp_path):
 
 def test_bundled_rides_are_real_and_calibrated():
     rides = load_attractions().values()
-    assert len(rides) >= 40
+    assert len(rides) >= 80
+    assert {"Magic Kingdom", "EPCOT", "Islands of Adventure"} <= {a.park for a in rides}
     for a in rides:
         assert a.queue_times_id and a.queue_times_park_id
         assert a.real_avg_posted_wait_min is not None
@@ -45,7 +61,7 @@ def test_bundled_rides_are_real_and_calibrated():
 def test_bundled_calibration_is_close_to_real_waits():
     """Spot-check that the shipped demand still reproduces real average waits."""
     rides = load_attractions()
-    for ride_id in ["harry-potter-and-the-escape-from-gringotts", "jurassic-world-velocicoaster",
-                    "mario-kart-bowsers-challenge"]:
+    for ride_id in ["harry-potter-and-the-escape-from-gringotts", "seven-dwarfs-mine-train",
+                    "avatar-flight-of-passage"]:
         a = rides[ride_id]
         assert abs(average_posted_wait(a) - a.real_avg_posted_wait_min) < 5
