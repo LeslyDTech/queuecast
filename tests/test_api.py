@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from queuecast.api import app, get_store
+from queuecast.api import app, default_db_path, get_store
 from queuecast.db import RunStore
 
 
@@ -75,3 +75,14 @@ def test_compare_rejects_out_of_range_share(client):
         json={"attraction_id": "comet-coaster", "priority_shares": [0.2, 1.5]},
     )
     assert res.status_code == 422
+
+
+
+def test_default_db_path(monkeypatch):
+    monkeypatch.delenv("QUEUECAST_DB", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    assert default_db_path() == "queuecast.db"
+    monkeypatch.setenv("VERCEL", "1")
+    assert default_db_path() == "/tmp/queuecast.db"
+    monkeypatch.setenv("QUEUECAST_DB", "custom.db")
+    assert default_db_path() == "custom.db"

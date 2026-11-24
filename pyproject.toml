@@ -26,6 +26,8 @@ include = ["queuecast*"]
 [tool.setuptools.package-data]
 queuecast = ["data/*.json", "static/*.html"]
 
+[tool.vercel]
+entrypoint = "queuecast.api:app"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
