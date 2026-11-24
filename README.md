@@ -1,8 +1,12 @@
 # QueueCast
 
+# QueueCast
+
 ![CI](https://github.com/LeslyDTech/queuecast/actions/workflows/ci.yml/badge.svg)
+
 **[▶ Live demo](https://queuecast-sigma.vercel.app)** · [API docs](https://queuecast-sigma.vercel.app/docs)
-![QueueCast dashboard]("C:\Users\lesly\Downloads\dashboard.png")
+
+![QueueCast dashboard](docs/dashboard.png)
 **A discrete-event simulator that forecasts theme park attraction wait times and tests operating decisions before they happen on a real ride.**
 
 I work in a theme park kitchen, so I watch crowds rise and fall all day. QueueCast models one operating day at a ride and answers questions like these:
