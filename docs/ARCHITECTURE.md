@@ -5,7 +5,8 @@
 1. Produce believable wait-time curves for one attraction over one day.
 2. Make what-if comparisons fair by holding randomness constant (seeded runs).
 3. Keep the core engine dependency-free so it is easy to test and reason about.
-4. Expose results three ways: CLI for quick checks, REST API for integration, and a dashboard for demos.
+4. Ground the model in real data: calibrate demand to real average posted waits.
+5. Expose results three ways: CLI for quick checks, REST API for integration, and a dashboard for demos.
 
 ## Layers
 
@@ -14,6 +15,8 @@
 | Domain | `models.py` | standard library |
 | Engine | `simulator.py` | models |
 | Analytics | `metrics.py` | models |
+| Calibration | `calibrate.py` | engine, analytics |
+| Live data | `live.py` | standard library (`urllib`) |
 | Persistence | `db.py` | metrics (types only), `sqlite3` |
 | Interfaces | `api.py`, `cli.py`, `static/` | everything above |
 
@@ -25,7 +28,7 @@ Dependencies point in one direction only: the engine knows nothing about HTTP or
 
 **Events.** Stored as `(time, priority, sequence, event)` tuples in a min-heap. The `priority` field settles ties at the same timestamp in this order: a repair, then a breakdown, then an arrival, then a dispatch. That way an arriving guest can board the vehicle leaving at that exact second, and a ride that breaks at that second does not dispatch. The `sequence` counter keeps ordering stable and ensures the heap never compares Event objects directly.
 
-**Arrivals.** Hourly demand is `base_arrivals_per_hour × crowd_multiplier × hourly_profile[h]`. To sample a process whose rate changes over time, candidate arrivals are drawn at the peak rate, and each is kept with probability `rate(t) / peak_rate` (Lewis–Shedler thinning).
+**Arrivals.** Hourly demand is `base_arrivals_per_hour × crowd_multiplier × hourly_profile[h]`. To sample a process whose rate changes over time, a unit-rate Poisson clock advances by Exp(1) draws, and each value is mapped through the inverse of the cumulative arrival curve (time-rescaling). Arrivals, lane choice, and breakdowns each use their own random stream, so changing demand doesn't change when breakdowns happen. See [ADR 0003](decisions/0003-common-random-numbers.md).
 
 **Boarding.** For each dispatch:
 

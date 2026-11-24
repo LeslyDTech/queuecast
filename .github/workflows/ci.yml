@@ -30,4 +30,4 @@ jobs:
         run: pytest --cov=queuecast --cov-report=term-missing --cov-fail-under=85
 
       - name: Smoke test the CLI
-        run: queuecast compare comet-coaster --shares 0 0.3
+        run: queuecast compare revenge-of-the-mummy --shares 0 0.3

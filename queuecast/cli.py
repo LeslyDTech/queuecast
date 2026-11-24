@@ -2,14 +2,16 @@
 
 Examples:
     queuecast list
-    queuecast run comet-coaster --priority-share 0.3 --crowd 1.2
-    queuecast compare comet-coaster --shares 0 0.2 0.4 0.6
+    queuecast run jurassic-world-velocicoaster --priority-share 0.3 --crowd 1.2
+    queuecast compare revenge-of-the-mummy --shares 0 0.2 0.4 0.6
+    queuecast calibrate
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from queuecast.metrics import interval_metrics, summarize
 from queuecast.models import Scenario, load_attractions
@@ -23,13 +25,26 @@ def _fmt_clock(minutes_from_open: int, open_hour: int = 9) -> str:
     return f"{(h - 1) % 12 + 1}:{m:02d} {suffix}"
 
 
+DATA_FILE = Path(__file__).parent / "data" / "attractions.json"
+
+
 def cmd_list(_: argparse.Namespace) -> int:
-    print(f"{'ID':<22}{'NAME':<22}{'CAPACITY/HR':>12}{'DEMAND/HR':>11}")
+    print(f"{'ID':<48}{'PARK':<28}{'CAPACITY/HR':>12}{'REAL AVG WAIT':>15}")
     for a in load_attractions().values():
-        print(
-            f"{a.id:<22}{a.name:<22}{a.theoretical_hourly_capacity:>12.0f}"
-            f"{a.base_arrivals_per_hour:>11.0f}"
-        )
+        real = f"{a.real_avg_posted_wait_min:.0f} min" if a.real_avg_posted_wait_min else "-"
+        print(f"{a.id:<48}{a.park:<28}{a.theoretical_hourly_capacity:>12.0f}{real:>15}")
+    return 0
+
+
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    from queuecast.calibrate import calibrate_file
+
+    print(f"Calibrating demand in {args.file} (this takes about 5 minutes)...")
+    results = calibrate_file(Path(args.file))
+    print(f"{'ID':<48}{'REAL':>7}{'SIM':>7}{'ERROR':>7}{'DEMAND/HR':>11}")
+    for r in results:
+        print(f"{r.attraction_id:<48}{r.target_wait_min:>7}{r.simulated_wait_min:>7}"
+              f"{r.error_min:>7}{r.base_arrivals_per_hour:>11.0f}")
     return 0
 
 
@@ -80,7 +95,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="queuecast", description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("list", help="List sample attractions").set_defaults(func=cmd_list)
+    sub.add_parser("list", help="List attractions").set_defaults(func=cmd_list)
+
+    cal = sub.add_parser("calibrate", help="Fit each ride's demand to its real average wait")
+    cal.add_argument("--file", default=str(DATA_FILE))
+    cal.set_defaults(func=cmd_calibrate)
 
     run = sub.add_parser("run", help="Simulate one day")
     run.add_argument("attraction")

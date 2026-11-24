@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from queuecast import __version__
 from queuecast.db import RunStore
+from queuecast.live import PARKS, LiveDataError, LiveWaitClient
 from queuecast.metrics import interval_metrics, summarize
 from queuecast.models import Scenario, load_attractions
 from queuecast.simulator import simulate
@@ -45,8 +46,16 @@ def get_store() -> RunStore:
 StoreDep = Annotated[RunStore, Depends(get_store)]
 
 
+@lru_cache
+def get_live_client() -> LiveWaitClient:
+    return LiveWaitClient()
+
+
+LiveDep = Annotated[LiveWaitClient, Depends(get_live_client)]
+
+
 class SimulationRequest(BaseModel):
-    attraction_id: str = Field(examples=["comet-coaster"])
+    attraction_id: str = Field(examples=["revenge-of-the-mummy"])
     priority_share: float = Field(0.0, ge=0, le=1, description="Share of guests in priority lane")
     priority_seat_ratio: float = Field(0.7, ge=0, le=1)
     crowd_multiplier: float = Field(1.0, ge=0, le=5)
@@ -84,6 +93,11 @@ def list_attractions() -> list[dict]:
         {
             "id": a.id,
             "name": a.name,
+            "park": a.park,
+            "land": a.land,
+            "queue_times_park_id": a.queue_times_park_id,
+            "queue_times_id": a.queue_times_id,
+            "real_avg_posted_wait_min": a.real_avg_posted_wait_min,
             "vehicle_capacity": a.vehicle_capacity,
             "dispatch_interval_s": a.dispatch_interval_s,
             "theoretical_hourly_capacity": round(a.theoretical_hourly_capacity),
@@ -155,3 +169,20 @@ def get_wait_times(run_id: int, store: StoreDep) -> list[dict]:
 @app.get("/reports/attractions")
 def attraction_report(store: StoreDep) -> list[dict]:
     return store.attraction_report()
+
+
+@app.get("/live/parks")
+def live_parks() -> list[dict]:
+    """Real parks with live posted wait times available."""
+    return [{"park_id": pid, "name": name} for pid, name in PARKS.items()]
+
+
+@app.get("/live/parks/{park_id}")
+def live_park_waits(park_id: int, client: LiveDep) -> dict:
+    """Current posted waits for one park, refreshed at most every 5 minutes."""
+    try:
+        return client.get_park(park_id)
+    except KeyError:
+        raise HTTPException(404, f"Park {park_id} is not supported") from None
+    except LiveDataError as exc:
+        raise HTTPException(502, str(exc)) from None

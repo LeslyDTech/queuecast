@@ -22,13 +22,19 @@ class Attraction:
     base_arrivals_per_hour: float
     mtbf_minutes: float | None = None  # mean time between breakdowns
     mttr_minutes: float | None = None  # mean time to repair
+    # Real-world reference data (see docs/DATA.md)
+    park: str = ""
+    land: str = ""
+    queue_times_park_id: int | None = None
+    queue_times_id: int | None = None
+    real_avg_posted_wait_min: float | None = None
 
     def __post_init__(self) -> None:
         if self.vehicle_capacity <= 0:
             raise ValueError("vehicle_capacity must be positive")
         if self.dispatch_interval_s <= 0:
             raise ValueError("dispatch_interval_s must be positive")
-        if self.base_arrivals_per_hour < 0:
+        if self.base_arrivals_per_hour is None or self.base_arrivals_per_hour < 0:
             raise ValueError("base_arrivals_per_hour cannot be negative")
         if (self.mtbf_minutes is None) != (self.mttr_minutes is None):
             raise ValueError("mtbf_minutes and mttr_minutes must both be set or both be None")
@@ -92,6 +98,11 @@ class SimulationResult:
 
 
 def load_attractions() -> dict[str, Attraction]:
-    """Load the bundled sample attractions keyed by id."""
+    """Load the bundled attractions keyed by id."""
+    return {item["id"]: Attraction(**item) for item in load_attraction_records()}
+
+
+def load_attraction_records() -> list[dict]:
+    """Raw attraction records, including ones not yet calibrated."""
     raw = resources.files("queuecast").joinpath("data/attractions.json").read_text("utf-8")
-    return {item["id"]: Attraction(**item) for item in json.loads(raw)}
+    return json.loads(raw)
