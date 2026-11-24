@@ -3,32 +3,55 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>QueueCast</title>
+<title>QueueCast · Theme park wait-time simulator</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-  :root { --ink:#1d2433; --muted:#5d6678; --line:#dfe3ea; --bg:#f7f8fa; --accent:#2f5bd3; --warm:#d9822b; }
+  :root { --ink:#1d2433; --muted:#5d6678; --line:#dfe3ea; --bg:#f7f8fa; --accent:#2f5bd3; --warm:#d9822b; --real:#6b7280; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
-  header { padding:20px 32px; border-bottom:1px solid var(--line); background:#fff; }
+  a { color:var(--accent); }
+  header { padding:20px 32px; border-bottom:1px solid var(--line); background:#fff; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
   header h1 { margin:0; font-size:20px; }
-  header p { margin:4px 0 0; color:var(--muted); font-size:14px; }
-  main { display:grid; grid-template-columns: 280px 1fr; gap:24px; padding:24px 32px; max-width:1200px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:14px; max-width:760px; }
+  .header-links { display:flex; gap:16px; font-size:14px; font-weight:600; }
+  .header-links a { text-decoration:none; }
+  main { display:grid; grid-template-columns: 320px 1fr; grid-template-areas: "controls results" "about results"; align-items:start; gap:16px 24px; padding:24px 32px; max-width:1240px; }
+  .controls { grid-area:controls; }
+  .about { grid-area:about; }
+  .results { grid-area:results; }
   .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:20px; }
   label { display:block; font-size:13px; font-weight:600; margin:14px 0 6px; }
+  label:first-child { margin-top:0; }
   label span { float:right; font-weight:400; color:var(--muted); }
   select, input[type=range], input[type=number] { width:100%; }
-  select, input[type=number] { padding:8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
-  button { margin-top:20px; width:100%; padding:10px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  select, input[type=number] { padding:8px; border:1px solid var(--line); border-radius:6px; font:inherit; background:#fff; }
+  .ride-meta { margin-top:6px; font-size:12px; color:var(--muted); }
+  .day-row { display:flex; gap:8px; }
+  .day-row input { flex:1; }
+  button { font:inherit; font-weight:600; border-radius:6px; cursor:pointer; }
   button:disabled { opacity:.6; cursor:wait; }
-  .stats { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:16px; }
-  .stat { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
-  .stat .k { font-size:12px; color:var(--muted); }
-  .stat .v { font-size:22px; font-weight:700; margin-top:4px; }
-  .compare { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:14px; color:var(--muted); }
-  .compare b { color:var(--ink); }
+  .primary { margin-top:20px; width:100%; padding:10px; border:0; background:var(--accent); color:#fff; }
+  .secondary { padding:8px 12px; border:1px solid var(--line); background:#fff; color:var(--ink); white-space:nowrap; }
+  .secondary:hover { border-color:var(--accent); }
   .check { display:flex; gap:8px; align-items:center; font-weight:400; }
   #error { color:#b42318; font-size:13px; margin-top:10px; }
-  .live { max-width:1200px; padding:0 32px 40px; }
+  .about h2 { margin:0 0 8px; font-size:15px; }
+  .about ol { margin:0; padding-left:18px; font-size:13px; color:var(--muted); line-height:1.5; }
+  .about li + li { margin-top:6px; }
+  .about .links { margin-top:12px; font-size:13px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+  .stats { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px; }
+  .stat { background:#fff; border:1px solid var(--line); border-top:3px solid var(--line); border-radius:8px; padding:14px; }
+  .stat .k { font-size:12px; color:var(--muted); }
+  .stat .v { font-size:24px; font-weight:700; margin-top:4px; font-variant-numeric: tabular-nums; }
+  .stat .s { font-size:11px; color:var(--muted); margin-top:2px; }
+  .stat.sim { border-top:3px solid var(--accent); }
+  .stat.real { border-top:3px solid var(--real); }
+  .stat.now { border-top:3px solid var(--warm); }
+  .details { font-size:13px; color:var(--muted); margin:0 2px 12px; line-height:1.5; }
+  .details b { color:var(--ink); }
+  .chart-panel { padding:16px 20px 12px; }
+  .chart-box { position:relative; height:360px; }
+  .live { max-width:1240px; padding:0 32px 40px; }
   .live-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
   .live-head h2 { margin:0; font-size:18px; }
   .live-head p { margin:4px 0 0; color:var(--muted); font-size:13px; }
@@ -44,45 +67,75 @@
   .ride.closed { color:var(--muted); }
   .ride.closed .mins { font-weight:400; }
   .credit { margin-top:12px; font-size:12px; color:var(--muted); }
-  .credit a { color:var(--accent); }
-  @media (max-width: 800px) { .live { padding:0 16px 32px; } .ride { grid-template-columns: 1fr 64px; } .ride .track { display:none; } }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 900px) {
+    header, main { padding-left:16px; padding-right:16px; }
+    main { grid-template-columns: 1fr; grid-template-areas: "controls" "results" "about"; }
+    .chart-box { height:280px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .live { padding:0 16px 32px; }
+    .ride { grid-template-columns: 1fr 64px; }
+    .ride .track { display:none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>QueueCast</h1>
-  <p>Simulate a day at 86 real Walt Disney World and Universal Orlando rides, calibrated to their actual average posted waits. Test how crowds, priority-lane usage, and downtime change the line.</p>
+  <div>
+    <h1>QueueCast</h1>
+    <p>Simulate a day at 86 real Walt Disney World and Universal Orlando rides, calibrated to their actual average posted waits. Test how crowds, priority-lane usage, and downtime change the line.</p>
+  </div>
+  <nav class="header-links">
+    <a href="https://github.com/LeslyDTech/queuecast" target="_blank" rel="noopener">GitHub</a>
+    <a href="/docs" target="_blank" rel="noopener">API</a>
+  </nav>
 </header>
 <main>
-  <section class="panel">
-    <label for="attraction">Attraction</label>
-    <select id="attraction"></select>
+    <section class="panel controls">
+      <label for="attraction">Ride</label>
+      <select id="attraction"></select>
+      <div class="ride-meta" id="rideMeta"></div>
 
-    <label for="crowd">Crowd level <span id="crowdVal">1.0x</span></label>
-    <input id="crowd" type="range" min="0.5" max="2" step="0.1" value="1" />
+      <label for="crowd">Crowd level <span id="crowdVal">1.0x</span></label>
+      <input id="crowd" type="range" min="0.5" max="2" step="0.1" value="1" />
 
-    <label for="priority">Priority lane share <span id="priorityVal">0%</span></label>
-    <input id="priority" type="range" min="0" max="0.8" step="0.05" value="0" />
+      <label for="priority">Priority lane share <span id="priorityVal">0%</span></label>
+      <input id="priority" type="range" min="0" max="0.8" step="0.05" value="0" />
 
-    <label for="seed">Random seed</label>
-    <input id="seed" type="number" value="42" />
+      <label for="seed">Simulated day #</label>
+      <div class="day-row">
+        <input id="seed" type="number" min="1" value="42" />
+        <button class="secondary" id="newDay" type="button" title="Simulate a different day">🎲 New day</button>
+      </div>
 
-    <label class="check"><input id="breakdowns" type="checkbox" checked /> Include breakdowns</label>
+      <label class="check"><input id="breakdowns" type="checkbox" checked /> Include breakdowns</label>
 
-    <button id="run">Run simulation</button>
-    <div id="error"></div>
-  </section>
+      <button class="primary" id="run">Run simulation</button>
+      <div id="error" role="alert"></div>
+    </section>
 
-  <section>
+    <section class="panel about">
+      <h2>How it works</h2>
+      <ol>
+        <li>Each ride's capacity is estimated from public descriptions of its ride system.</li>
+        <li>Guest demand is calibrated so that, averaged over many simulated days, the ride's posted wait matches its real all-time average.</li>
+        <li>Each run simulates one day: guests arrive, ride vehicles dispatch, and rides sometimes break down. Days vary, so try a few.</li>
+      </ol>
+      <div class="links">
+        <a href="https://github.com/LeslyDTech/queuecast" target="_blank" rel="noopener">Source code</a>
+        <a href="https://github.com/LeslyDTech/queuecast/blob/main/docs/DATA.md" target="_blank" rel="noopener">Data and accuracy</a>
+        <a href="/docs" target="_blank" rel="noopener">API docs</a>
+      </div>
+    </section>
+
+  <section class="results">
     <div class="stats">
-      <div class="stat"><div class="k">Standby avg wait</div><div class="v" id="sAvg">–</div></div>
-      <div class="stat"><div class="k">Standby 90th pct</div><div class="v" id="sP90">–</div></div>
-      <div class="stat"><div class="k">Guests / hour</div><div class="v" id="tput">–</div></div>
-      <div class="stat"><div class="k">Downtime</div><div class="v" id="down">–</div></div>
+      <div class="stat sim"><div class="k">Avg posted wait</div><div class="v" id="simAvg">–</div><div class="s">this simulated day</div></div>
+      <div class="stat real"><div class="k">Real average</div><div class="v" id="realAvg">–</div><div class="s">all-time posted wait</div></div>
+      <div class="stat now"><div class="k">Posted right now</div><div class="v" id="nowWait">–</div><div class="s" id="nowSub">live from the park</div></div>
+      <div class="stat"><div class="k">Downtime</div><div class="v" id="down">–</div><div class="s">from breakdowns</div></div>
     </div>
-    <div class="compare" id="compare">Comparing against real data…</div>
-    <div class="panel"><canvas id="chart" height="130"></canvas></div>
+    <div class="details" id="details"></div>
+    <div class="panel chart-panel"><div class="chart-box"><canvas id="chart" role="img" aria-label="Posted wait through the simulated day"></canvas></div></div>
   </section>
 </main>
 
@@ -103,14 +156,33 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+const OPEN_HOUR = 9; // the simulated park day runs 9 AM to 9 PM
+const COLORS = { sim: "#2f5bd3", priority: "#9aa9d6", real: "#6b7280", now: "#d9822b" };
 let chart;
+let attractions = {};
+let lastWaits = [];
 
 function clock(minFromOpen) {
-  const total = 9 * 60 + minFromOpen, h = Math.floor(total / 60), m = total % 60;
-  return `${((h - 1) % 12) + 1}:${String(m).padStart(2, "0")}${h < 12 ? "a" : "p"}`;
+  const total = OPEN_HOUR * 60 + minFromOpen, h = Math.floor(total / 60), m = total % 60;
+  return `${((h - 1) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
-let attractions = {};
+function hourLabel(minFromOpen) {
+  const h = OPEN_HOUR + minFromOpen / 60;
+  return `${((h - 1) % 12) + 1} ${h < 12 ? "AM" : "PM"}`;
+}
+
+// Minutes since park open right now in Orlando, or null outside park hours.
+function minutesIntoParkDay() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour: "numeric", minute: "numeric", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  const mins = (get("hour") - OPEN_HOUR) * 60 + get("minute");
+  return mins >= 0 && mins < 12 * 60 ? mins : null;
+}
+
+const fmt = (v) => (v == null ? "–" : `${Math.round(v)} min`);
 
 async function loadAttractions() {
   const list = await (await fetch("/attractions")).json();
@@ -130,42 +202,39 @@ async function loadAttractions() {
     }
     $("attraction").append(group);
   }
+  showRideMeta();
 }
 
-async function showComparison(waits) {
-  // Posted-style average: one reading per 15-minute window, averaged over the day.
-  // This is the same measure the calibration matched against real data.
-  const readings = waits.map((w) => w.standby_avg_wait_min).filter((v) => v != null);
-  const posted = readings.length ? readings.reduce((x, y) => x + y, 0) / readings.length : 0;
+function showRideMeta() {
   const a = attractions[$("attraction").value];
-  const parts = [`Simulated average posted wait: <b>${posted.toFixed(1)} min</b>`];
-  if (a.real_avg_posted_wait_min != null) {
-    parts.push(`real all-time average: <b>${a.real_avg_posted_wait_min} min</b>`);
-  }
-  const note = '<br><small>This is one simulated day. Breakdowns make single days vary a lot; averaged over many days, each ride is calibrated to match its real average. Try other seeds.</small>';
-  $("compare").innerHTML = parts.join(" · ") + note;
-  if (!a.queue_times_park_id) return;
+  if (!a) return;
+  $("attraction").title = a.name; // full name on hover if the menu cuts it off
+  $("rideMeta").textContent = [a.park, a.land, `${a.theoretical_hourly_capacity.toLocaleString()} riders/hr (est.)`]
+    .filter(Boolean).join(" · ");
+}
+
+async function fetchPostedNow(a) {
+  if (!a.queue_times_park_id) return null;
   try {
     const live = await (await fetch(`/live/parks/${a.queue_times_park_id}`)).json();
-    const ride = (live.rides || []).find((r) => r.id === a.queue_times_id);
-    if (ride) {
-      parts.push(ride.is_open ? `posted right now: <b>${ride.wait_time_min} min</b>` : "closed right now");
-      $("compare").innerHTML = parts.join(" · ") + note;
-    }
+    return (live.rides || []).find((r) => r.id === a.queue_times_id) ?? null;
   } catch {
-    /* live data is optional */
+    return null; // live data is optional
   }
 }
 
 async function run() {
   $("run").disabled = true;
+  $("run").textContent = "Running…";
   $("error").textContent = "";
   try {
+    const a = attractions[$("attraction").value];
+    const priorityShare = Number($("priority").value);
     const body = {
-      attraction_id: $("attraction").value,
+      attraction_id: a.id,
       crowd_multiplier: Number($("crowd").value),
-      priority_share: Number($("priority").value),
-      seed: Number($("seed").value),
+      priority_share: priorityShare,
+      seed: Number($("seed").value) || 1,
       breakdowns_enabled: $("breakdowns").checked,
     };
     const created = await fetch("/simulations", {
@@ -174,39 +243,103 @@ async function run() {
     if (!created.ok) throw new Error((await created.json()).detail ?? "Simulation failed");
     const { run_id, summary } = await created.json();
     const waits = await (await fetch(`/simulations/${run_id}/wait-times`)).json();
+    lastWaits = waits;
 
-    $("sAvg").textContent = `${summary.standby_avg_wait_min} min`;
-    $("sP90").textContent = `${summary.standby_p90_wait_min} min`;
-    $("tput").textContent = summary.throughput_per_hour;
-    $("down").textContent = `${summary.downtime_min} min`;
-    draw(waits);
-    showComparison(waits);
+    // Posted-style average: one reading per 15-minute window, averaged over the day.
+    // It's the same measure the calibration matched against real data.
+    const readings = waits.map((w) => w.standby_avg_wait_min).filter((v) => v != null);
+    const postedAvg = readings.length ? readings.reduce((x, y) => x + y, 0) / readings.length : 0;
+    const peak = waits.reduce((best, w) => ((w.standby_avg_wait_min ?? -1) > (best?.standby_avg_wait_min ?? -1) ? w : best), null);
+
+    $("simAvg").textContent = fmt(postedAvg);
+    $("realAvg").textContent = fmt(a.real_avg_posted_wait_min);
+    $("down").textContent = fmt(summary.downtime_min);
+    $("nowWait").textContent = "…";
+    $("nowSub").textContent = "live from the park";
+
+    const crowd = body.crowd_multiplier === 1 ? "a normal crowd" : `${body.crowd_multiplier.toFixed(1)}x the normal crowd`;
+    $("details").innerHTML =
+      `Day #${body.seed} with ${crowd}. ` +
+      (peak && peak.standby_avg_wait_min != null ? `Longest posted wait: <b>${Math.round(peak.standby_avg_wait_min)} min</b> around ${clock(peak.bucket_start_min)}. ` : "") +
+      `Average wait per guest: <b>${Math.round(summary.standby_avg_wait_min)} min</b> ` +
+      `(higher than the posted average because most guests arrive when the line is longest). ` +
+      `${Math.round(summary.throughput_per_hour).toLocaleString()} riders per hour.` +
+      (summary.downtime_min > 0 && a.real_avg_posted_wait_min != null && postedAvg > a.real_avg_posted_wait_min * 1.15
+        ? ` This day runs above the real average partly because of ${Math.round(summary.downtime_min)} min of breakdowns; click 🎲 New day to see others.`
+        : "");
+
+    draw(waits, a, priorityShare > 0, null);
+
+    const now = await fetchPostedNow(a);
+    if (now && now.is_open) {
+      $("nowWait").textContent = fmt(now.wait_time_min);
+      draw(waits, a, priorityShare > 0, now.wait_time_min);
+    } else {
+      $("nowWait").textContent = now ? "Closed" : "–";
+      $("nowSub").textContent = now ? "ride is closed right now" : "live data unavailable";
+    }
   } catch (err) {
     $("error").textContent = err.message;
   } finally {
     $("run").disabled = false;
+    $("run").textContent = "Run simulation";
   }
 }
 
-function draw(waits) {
-  const data = {
-    labels: waits.map((w) => clock(w.bucket_start_min)),
-    datasets: [
-      { label: "Standby wait (min)", data: waits.map((w) => w.standby_avg_wait_min), borderColor: "#2f5bd3", tension: 0.3, pointRadius: 0, spanGaps: true },
-      { label: "Priority wait (min)", data: waits.map((w) => w.priority_avg_wait_min), borderColor: "#d9822b", tension: 0.3, pointRadius: 0, spanGaps: true },
-    ],
+function draw(waits, a, showPriority, postedNow) {
+  const labels = waits.map((w) => w.bucket_start_min);
+  const datasets = [
+    { label: "Simulated posted wait", data: waits.map((w) => w.standby_avg_wait_min), borderColor: COLORS.sim, backgroundColor: COLORS.sim, borderWidth: 2.5, tension: 0.3, pointRadius: 0, spanGaps: true },
+  ];
+  if (a.real_avg_posted_wait_min != null) {
+    datasets.push({ label: "Real all-time average", data: waits.map(() => a.real_avg_posted_wait_min), borderColor: COLORS.real, backgroundColor: COLORS.real, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0 });
+  }
+  if (showPriority) {
+    datasets.push({ label: "Priority lane wait", data: waits.map((w) => w.priority_avg_wait_min), borderColor: COLORS.priority, backgroundColor: COLORS.priority, borderWidth: 2, tension: 0.3, pointRadius: 0, spanGaps: true });
+  }
+  const nowMin = minutesIntoParkDay();
+  if (postedNow != null && nowMin != null) {
+    const idx = Math.min(Math.floor(nowMin / 15), waits.length - 1);
+    datasets.push({ label: "Posted right now", data: waits.map((_, i) => (i === idx ? postedNow : null)), borderColor: COLORS.now, backgroundColor: COLORS.now, pointRadius: 7, pointHoverRadius: 8, showLine: false });
+  }
+
+  const everyHours = $("chart").parentElement.clientWidth < 520 ? 3 : 1;
+  const options = {
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { position: "top", align: "end", labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8 } },
+      tooltip: {
+        filter: (item) => item.raw != null,
+        callbacks: {
+          title: (items) => clock(items[0].label),
+          label: (item) => ` ${item.dataset.label}: ${Math.round(item.raw)} min`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { autoSkip: false, maxRotation: 0, callback: (value, i) => (labels[i] % (60 * everyHours) === 0 ? hourLabel(labels[i]) : "") },
+      },
+      y: { beginAtZero: true, title: { display: true, text: "Minutes" }, grid: { color: "#eef1f6" } },
+    },
   };
-  if (chart) { chart.data = data; chart.update(); return; }
-  chart = new Chart($("chart"), {
-    type: "line", data,
-    options: { interaction: { mode: "index", intersect: false }, scales: { y: { beginAtZero: true, title: { display: true, text: "Minutes" } } } },
-  });
+  if (chart) chart.destroy();
+  chart = new Chart($("chart"), { type: "line", data: { labels, datasets }, options });
 }
 
 $("crowd").oninput = (e) => ($("crowdVal").textContent = `${Number(e.target.value).toFixed(1)}x`);
 $("priority").oninput = (e) => ($("priorityVal").textContent = `${Math.round(e.target.value * 100)}%`);
 $("run").onclick = run;
-loadAttractions().then(run);
+$("newDay").onclick = () => {
+  $("seed").value = Math.floor(Math.random() * 9999) + 1;
+  run();
+};
+
+// ---- Live wait times ------------------------------------------------------
+
 async function loadLiveParks() {
   const parks = await (await fetch("/live/parks")).json();
   for (const p of parks) {
@@ -274,12 +407,16 @@ async function loadLiveWaits() {
 
 $("livePark").onchange = loadLiveWaits;
 $("attraction").onchange = () => {
+  showRideMeta();
   const parkId = attractions[$("attraction").value]?.queue_times_park_id;
   if (parkId && String(parkId) !== $("livePark").value) {
     $("livePark").value = parkId;
     loadLiveWaits();
   }
+  run();
 };
+
+loadAttractions().then(run);
 loadLiveParks().then(loadLiveWaits);
 </script>
 </body>
